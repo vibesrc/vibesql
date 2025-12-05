@@ -1,12 +1,12 @@
 [package]
-name = "vibesql"
+name = "vibesql-rs"
 version = "0.1.0"
 edition = "2021"
 description = "A SQL parser and semantic analyzer conforming to modern ISO SQL standards"
 license = "MIT"
 repository = "https://github.com/bherbruck/vibesql"
 homepage = "https://github.com/bherbruck/vibesql"
-documentation = "https://docs.rs/vibesql"
+documentation = "https://docs.rs/vibesql-rs"
 readme = "README.md"
 keywords = ["sql", "parser", "database", "query", "analyzer"]
 categories = ["database", "parser-implementations"]
