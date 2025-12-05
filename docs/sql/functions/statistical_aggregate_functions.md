@@ -1,0 +1,960 @@
+# Statistical aggregate functions
+
+SQL supports statistical aggregate functions.
+To learn about the syntax for aggregate function calls, see
+[Aggregate function calls][agg-function-calls].
+
+### Function list
+
+| Name                          | Summary                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------- |
+| [`CORR`](#corr)               | Computes the Pearson coefficient of correlation of a set of number pairs. |
+| [`COVAR_POP`](#covar-pop)     | Computes the population covariance of a set of number pairs.              |
+| [`COVAR_SAMP`](#covar-samp)   | Computes the sample covariance of a set of number pairs.                  |
+| [`STDDEV`](#stddev)           | An alias of the `STDDEV_SAMP` function.                                   |
+| [`STDDEV_POP`](#stddev-pop)   | Computes the population (biased) standard deviation of the values.        |
+| [`STDDEV_SAMP`](#stddev-samp) | Computes the sample (unbiased) standard deviation of the values.          |
+| [`VAR_POP`](#var-pop)         | Computes the population (biased) variance of the values.                  |
+| [`VAR_SAMP`](#var-samp)       | Computes the sample (unbiased) variance of the values.                    |
+| [`VARIANCE`](#variance)       | An alias of `VAR_SAMP`.                                                   |
+
+### `CORR`
+
+```sql
+CORR(
+  X1, X2
+  [ WHERE where_expression ]
+  [ HAVING { MAX | MIN } having_expression ]
+)
+[ OVER over_clause ]
+
+over_clause:
+  { named_window | ( [ window_specification ] ) }
+
+window_specification:
+  [ named_window ]
+  [ PARTITION BY partition_expression [, ...] ]
+  [ ORDER BY expression [ { ASC | DESC }  ] [, ...] ]
+  [ window_frame_clause ]
+
+```
+
+**Description**
+
+Returns the [Pearson coefficient][stat-agg-link-to-pearson-coefficient]
+of correlation of a set of number pairs. For each number pair, the first number
+is the dependent variable and the second number is the independent variable.
+The return result is between `-1` and `1`. A result of `0` indicates no
+correlation.
+
+All numeric types are supported. If the
+input is `NUMERIC` or `NUMERIC` then the internal aggregation is
+stable with the final output converted to a `DOUBLE`.
+Otherwise the input is converted to a `DOUBLE`
+before aggregation, resulting in a potentially unstable result.
+
+This function ignores any input pairs that contain one or more `NULL` values. If
+there are fewer than two input pairs without `NULL` values, this function
+returns `NULL`.
+
+`NaN` is produced if:
+
+- Any input value is `NaN`
+- Any input value is positive infinity or negative infinity.
+- The variance of `X1` or `X2` is `0`.
+- The covariance of `X1` and `X2` is `0`.
+
+To learn more about the optional aggregate clauses that you can pass
+into this function, see
+[Aggregate function calls][aggregate-function-calls].
+
+[aggregate-function-calls]: aggregate_function_calls.md
+
+To learn more about the `OVER` clause and how to use it, see
+[Window function calls][window-function-calls].
+
+[window-function-calls]: window_function_calls.md
+
+**Return Data Type**
+
+`DOUBLE`
+
+**Examples**
+
+```sql
+SELECT CORR(y, x) AS results
+FROM
+  UNNEST(
+    [
+      STRUCT(1.0 AS y, 5.0 AS x),
+      (3.0, 9.0),
+      (4.0, 7.0)]);
+
+/*--------------------+
+ | results            |
+ +--------------------+
+ | 0.6546536707079772 |
+ +--------------------*/
+```
+
+```sql
+SELECT CORR(y, x) AS results
+FROM
+  UNNEST(
+    [
+      STRUCT(1.0 AS y, 5.0 AS x),
+      (3.0, 9.0),
+      (4.0, NULL)]);
+
+/*---------+
+ | results |
+ +---------+
+ | 1       |
+ +---------*/
+```
+
+```sql
+SELECT CORR(y, x) AS results
+FROM UNNEST([STRUCT(1.0 AS y, NULL AS x),(9.0, 3.0)])
+
+/*---------+
+ | results |
+ +---------+
+ | NULL    |
+ +---------*/
+```
+
+```sql
+SELECT CORR(y, x) AS results
+FROM UNNEST([STRUCT(1.0 AS y, NULL AS x),(9.0, NULL)])
+
+/*---------+
+ | results |
+ +---------+
+ | NULL    |
+ +---------*/
+```
+
+```sql
+SELECT CORR(y, x) AS results
+FROM
+  UNNEST(
+    [
+      STRUCT(1.0 AS y, 5.0 AS x),
+      (3.0, 9.0),
+      (4.0, 7.0),
+      (5.0, 1.0),
+      (7.0, CAST('Infinity' as DOUBLE))])
+
+/*---------+
+ | results |
+ +---------+
+ | NaN     |
+ +---------*/
+```
+
+```sql
+SELECT CORR(x, y) AS results
+FROM
+  (
+    SELECT 0 AS x, 0 AS y
+    UNION ALL
+    SELECT 0 AS x, 0 AS y
+  )
+
+/*---------+
+ | results |
+ +---------+
+ | NaN     |
+ +---------*/
+```
+
+[stat-agg-link-to-pearson-coefficient]: https://en.wikipedia.org/wiki/Pearson_product-moment_correlation_coefficient
+
+### `COVAR_POP`
+
+```sql
+COVAR_POP(
+  X1, X2
+  [ WHERE where_expression ]
+  [ HAVING { MAX | MIN } having_expression ]
+)
+[ OVER over_clause ]
+
+over_clause:
+  { named_window | ( [ window_specification ] ) }
+
+window_specification:
+  [ named_window ]
+  [ PARTITION BY partition_expression [, ...] ]
+  [ ORDER BY expression [ { ASC | DESC }  ] [, ...] ]
+  [ window_frame_clause ]
+
+```
+
+**Description**
+
+Returns the population [covariance][stat-agg-link-to-covariance] of
+a set of number pairs. The first number is the dependent variable; the second
+number is the independent variable. The return result is between `-Inf` and
+`+Inf`.
+
+All numeric types are supported. If the
+input is `NUMERIC` or `NUMERIC` then the internal aggregation is
+stable with the final output converted to a `DOUBLE`.
+Otherwise the input is converted to a `DOUBLE`
+before aggregation, resulting in a potentially unstable result.
+
+This function ignores any input pairs that contain one or more `NULL` values. If
+there is no input pair without `NULL` values, this function returns `NULL`.
+If there is exactly one input pair without `NULL` values, this function returns
+`0`.
+
+`NaN` is produced if:
+
+- Any input value is `NaN`
+- Any input value is positive infinity or negative infinity.
+
+To learn more about the optional aggregate clauses that you can pass
+into this function, see
+[Aggregate function calls][aggregate-function-calls].
+
+[aggregate-function-calls]: aggregate_function_calls.md
+
+To learn more about the `OVER` clause and how to use it, see
+[Window function calls][window-function-calls].
+
+[window-function-calls]: window_function_calls.md
+
+**Return Data Type**
+
+`DOUBLE`
+
+**Examples**
+
+```sql
+SELECT COVAR_POP(y, x) AS results
+FROM
+  UNNEST(
+    [
+      STRUCT(1.0 AS y, 1.0 AS x),
+      (2.0, 6.0),
+      (9.0, 3.0),
+      (2.0, 6.0),
+      (9.0, 3.0)])
+
+/*---------------------+
+ | results             |
+ +---------------------+
+ | -1.6800000000000002 |
+ +---------------------*/
+```
+
+```sql
+SELECT COVAR_POP(y, x) AS results
+FROM UNNEST([STRUCT(1.0 AS y, NULL AS x),(9.0, 3.0)])
+
+/*---------+
+ | results |
+ +---------+
+ | 0       |
+ +---------*/
+```
+
+```sql
+SELECT COVAR_POP(y, x) AS results
+FROM UNNEST([STRUCT(1.0 AS y, NULL AS x),(9.0, NULL)])
+
+/*---------+
+ | results |
+ +---------+
+ | NULL    |
+ +---------*/
+```
+
+```sql
+SELECT COVAR_POP(y, x) AS results
+FROM
+  UNNEST(
+    [
+      STRUCT(1.0 AS y, 1.0 AS x),
+      (2.0, 6.0),
+      (9.0, 3.0),
+      (2.0, 6.0),
+      (NULL, 3.0)])
+
+/*---------+
+ | results |
+ +---------+
+ | -1      |
+ +---------*/
+```
+
+```sql
+SELECT COVAR_POP(y, x) AS results
+FROM
+  UNNEST(
+    [
+      STRUCT(1.0 AS y, 1.0 AS x),
+      (2.0, 6.0),
+      (9.0, 3.0),
+      (2.0, 6.0),
+      (CAST('Infinity' as DOUBLE), 3.0)])
+
+/*---------+
+ | results |
+ +---------+
+ | NaN     |
+ +---------*/
+```
+
+[stat-agg-link-to-covariance]: https://en.wikipedia.org/wiki/Covariance
+
+### `COVAR_SAMP`
+
+```sql
+COVAR_SAMP(
+  X1, X2
+  [ WHERE where_expression ]
+  [ HAVING { MAX | MIN } having_expression ]
+)
+[ OVER over_clause ]
+
+over_clause:
+  { named_window | ( [ window_specification ] ) }
+
+window_specification:
+  [ named_window ]
+  [ PARTITION BY partition_expression [, ...] ]
+  [ ORDER BY expression [ { ASC | DESC }  ] [, ...] ]
+  [ window_frame_clause ]
+
+```
+
+**Description**
+
+Returns the sample [covariance][stat-agg-link-to-covariance] of a
+set of number pairs. The first number is the dependent variable; the second
+number is the independent variable. The return result is between `-Inf` and
+`+Inf`.
+
+All numeric types are supported. If the
+input is `NUMERIC` or `NUMERIC` then the internal aggregation is
+stable with the final output converted to a `DOUBLE`.
+Otherwise the input is converted to a `DOUBLE`
+before aggregation, resulting in a potentially unstable result.
+
+This function ignores any input pairs that contain one or more `NULL` values. If
+there are fewer than two input pairs without `NULL` values, this function
+returns `NULL`.
+
+`NaN` is produced if:
+
+- Any input value is `NaN`
+- Any input value is positive infinity or negative infinity.
+
+To learn more about the optional aggregate clauses that you can pass
+into this function, see
+[Aggregate function calls][aggregate-function-calls].
+
+This function can be used with the
+[`AGGREGATION_THRESHOLD` clause][agg-threshold-clause].
+
+[aggregate-function-calls]: aggregate_function_calls.md
+[agg-threshold-clause]: ../syntax/query_syntax.md#agg-threshold_clause
+
+To learn more about the `OVER` clause and how to use it, see
+[Window function calls][window-function-calls].
+
+[window-function-calls]: window_function_calls.md
+
+**Return Data Type**
+
+`DOUBLE`
+
+**Examples**
+
+```sql
+SELECT COVAR_SAMP(y, x) AS results
+FROM
+  UNNEST(
+    [
+      STRUCT(1.0 AS y, 1.0 AS x),
+      (2.0, 6.0),
+      (9.0, 3.0),
+      (2.0, 6.0),
+      (9.0, 3.0)])
+
+/*---------+
+ | results |
+ +---------+
+ | -2.1    |
+ +---------*/
+```
+
+```sql
+SELECT COVAR_SAMP(y, x) AS results
+FROM
+  UNNEST(
+    [
+      STRUCT(1.0 AS y, 1.0 AS x),
+      (2.0, 6.0),
+      (9.0, 3.0),
+      (2.0, 6.0),
+      (NULL, 3.0)])
+
+/*----------------------+
+ | results              |
+ +----------------------+
+ | --1.3333333333333333 |
+ +----------------------*/
+```
+
+```sql
+SELECT COVAR_SAMP(y, x) AS results
+FROM UNNEST([STRUCT(1.0 AS y, NULL AS x),(9.0, 3.0)])
+
+/*---------+
+ | results |
+ +---------+
+ | NULL    |
+ +---------*/
+```
+
+```sql
+SELECT COVAR_SAMP(y, x) AS results
+FROM UNNEST([STRUCT(1.0 AS y, NULL AS x),(9.0, NULL)])
+
+/*---------+
+ | results |
+ +---------+
+ | NULL    |
+ +---------*/
+```
+
+```sql
+SELECT COVAR_SAMP(y, x) AS results
+FROM
+  UNNEST(
+    [
+      STRUCT(1.0 AS y, 1.0 AS x),
+      (2.0, 6.0),
+      (9.0, 3.0),
+      (2.0, 6.0),
+      (CAST('Infinity' as DOUBLE), 3.0)])
+
+/*---------+
+ | results |
+ +---------+
+ | NaN     |
+ +---------*/
+```
+
+[stat-agg-link-to-covariance]: https://en.wikipedia.org/wiki/Covariance
+
+### `STDDEV`
+
+```sql
+STDDEV(
+  [ DISTINCT ]
+  expression
+  [ WHERE where_expression ]
+  [ HAVING { MAX | MIN } having_expression ]
+)
+[ OVER over_clause ]
+
+over_clause:
+  { named_window | ( [ window_specification ] ) }
+
+window_specification:
+  [ named_window ]
+  [ PARTITION BY partition_expression [, ...] ]
+  [ ORDER BY expression [ { ASC | DESC }  ] [, ...] ]
+  [ window_frame_clause ]
+
+```
+
+**Description**
+
+An alias of [STDDEV_SAMP][stat-agg-link-to-stddev-samp].
+
+[stat-agg-link-to-stddev-samp]: #stddev-samp
+
+### `STDDEV_POP`
+
+```sql
+STDDEV_POP(
+  [ DISTINCT ]
+  expression
+  [ WHERE where_expression ]
+  [ HAVING { MAX | MIN } having_expression ]
+)
+[ OVER over_clause ]
+
+over_clause:
+  { named_window | ( [ window_specification ] ) }
+
+window_specification:
+  [ named_window ]
+  [ PARTITION BY partition_expression [, ...] ]
+  [ ORDER BY expression [ { ASC | DESC }  ] [, ...] ]
+  [ window_frame_clause ]
+
+```
+
+**Description**
+
+Returns the population (biased) standard deviation of the values. The return
+result is between `0` and `+Inf`.
+
+All numeric types are supported. If the
+input is `NUMERIC` or `NUMERIC` then the internal aggregation is
+stable with the final output converted to a `DOUBLE`.
+Otherwise the input is converted to a `DOUBLE`
+before aggregation, resulting in a potentially unstable result.
+
+This function ignores any `NULL` inputs. If all inputs are ignored, this
+function returns `NULL`. If this function receives a single non-`NULL` input,
+it returns `0`.
+
+`NaN` is produced if:
+
+- Any input value is `NaN`
+- Any input value is positive infinity or negative infinity.
+
+To learn more about the optional aggregate clauses that you can pass
+into this function, see
+[Aggregate function calls][aggregate-function-calls].
+
+This function can be used with the
+[`AGGREGATION_THRESHOLD` clause][agg-threshold-clause].
+
+[aggregate-function-calls]: aggregate_function_calls.md
+[agg-threshold-clause]: ../syntax/query_syntax.md#agg-threshold_clause
+
+To learn more about the `OVER` clause and how to use it, see
+[Window function calls][window-function-calls].
+
+[window-function-calls]: window_function_calls.md
+
+`STDDEV_POP` can be used with differential privacy. To learn more, see
+[Differentially private aggregate functions][dp-functions].
+
+**Return Data Type**
+
+`DOUBLE`
+
+**Examples**
+
+```sql
+SELECT STDDEV_POP(x) AS results FROM UNNEST([10, 14, 18]) AS x
+
+/*-------------------+
+ | results           |
+ +-------------------+
+ | 3.265986323710904 |
+ +-------------------*/
+```
+
+```sql
+SELECT STDDEV_POP(x) AS results FROM UNNEST([10, 14, NULL]) AS x
+
+/*---------+
+ | results |
+ +---------+
+ | 2       |
+ +---------*/
+```
+
+```sql
+SELECT STDDEV_POP(x) AS results FROM UNNEST([10, NULL]) AS x
+
+/*---------+
+ | results |
+ +---------+
+ | 0       |
+ +---------*/
+```
+
+```sql
+SELECT STDDEV_POP(x) AS results FROM UNNEST([NULL]) AS x
+
+/*---------+
+ | results |
+ +---------+
+ | NULL    |
+ +---------*/
+```
+
+```sql
+SELECT STDDEV_POP(x) AS results FROM UNNEST([10, 14, CAST('Infinity' as DOUBLE)]) AS x
+
+/*---------+
+ | results |
+ +---------+
+ | NaN     |
+ +---------*/
+```
+
+[dp-functions]: #aggregate-dp-functions
+
+### `STDDEV_SAMP`
+
+```sql
+STDDEV_SAMP(
+  [ DISTINCT ]
+  expression
+  [ WHERE where_expression ]
+  [ HAVING { MAX | MIN } having_expression ]
+)
+[ OVER over_clause ]
+
+over_clause:
+  { named_window | ( [ window_specification ] ) }
+
+window_specification:
+  [ named_window ]
+  [ PARTITION BY partition_expression [, ...] ]
+  [ ORDER BY expression [ { ASC | DESC }  ] [, ...] ]
+  [ window_frame_clause ]
+
+```
+
+**Description**
+
+Returns the sample (unbiased) standard deviation of the values. The return
+result is between `0` and `+Inf`.
+
+All numeric types are supported. If the
+input is `NUMERIC` or `NUMERIC` then the internal aggregation is
+stable with the final output converted to a `DOUBLE`.
+Otherwise the input is converted to a `DOUBLE`
+before aggregation, resulting in a potentially unstable result.
+
+This function ignores any `NULL` inputs. If there are fewer than two non-`NULL`
+inputs, this function returns `NULL`.
+
+`NaN` is produced if:
+
+- Any input value is `NaN`
+- Any input value is positive infinity or negative infinity.
+
+To learn more about the optional aggregate clauses that you can pass
+into this function, see
+[Aggregate function calls][aggregate-function-calls].
+
+This function can be used with the
+[`AGGREGATION_THRESHOLD` clause][agg-threshold-clause].
+
+[aggregate-function-calls]: aggregate_function_calls.md
+[agg-threshold-clause]: ../syntax/query_syntax.md#agg-threshold_clause
+
+To learn more about the `OVER` clause and how to use it, see
+[Window function calls][window-function-calls].
+
+[window-function-calls]: window_function_calls.md
+
+**Return Data Type**
+
+`DOUBLE`
+
+**Examples**
+
+```sql
+SELECT STDDEV_SAMP(x) AS results FROM UNNEST([10, 14, 18]) AS x
+
+/*---------+
+ | results |
+ +---------+
+ | 4       |
+ +---------*/
+```
+
+```sql
+SELECT STDDEV_SAMP(x) AS results FROM UNNEST([10, 14, NULL]) AS x
+
+/*--------------------+
+ | results            |
+ +--------------------+
+ | 2.8284271247461903 |
+ +--------------------*/
+```
+
+```sql
+SELECT STDDEV_SAMP(x) AS results FROM UNNEST([10, NULL]) AS x
+
+/*---------+
+ | results |
+ +---------+
+ | NULL    |
+ +---------*/
+```
+
+```sql
+SELECT STDDEV_SAMP(x) AS results FROM UNNEST([NULL]) AS x
+
+/*---------+
+ | results |
+ +---------+
+ | NULL    |
+ +---------*/
+```
+
+```sql
+SELECT STDDEV_SAMP(x) AS results FROM UNNEST([10, 14, CAST('Infinity' as DOUBLE)]) AS x
+
+/*---------+
+ | results |
+ +---------+
+ | NaN     |
+ +---------*/
+```
+
+### `VAR_POP`
+
+```sql
+VAR_POP(
+  [ DISTINCT ]
+  expression
+  [ WHERE where_expression ]
+  [ HAVING { MAX | MIN } having_expression ]
+)
+[ OVER over_clause ]
+
+over_clause:
+  { named_window | ( [ window_specification ] ) }
+
+window_specification:
+  [ named_window ]
+  [ PARTITION BY partition_expression [, ...] ]
+  [ ORDER BY expression [ { ASC | DESC }  ] [, ...] ]
+  [ window_frame_clause ]
+
+```
+
+**Description**
+
+Returns the population (biased) variance of the values. The return result is
+between `0` and `+Inf`.
+
+All numeric types are supported. If the
+input is `NUMERIC` or `NUMERIC` then the internal aggregation is
+stable with the final output converted to a `DOUBLE`.
+Otherwise the input is converted to a `DOUBLE`
+before aggregation, resulting in a potentially unstable result.
+
+This function ignores any `NULL` inputs. If all inputs are ignored, this
+function returns `NULL`. If this function receives a single non-`NULL` input,
+it returns `0`.
+
+`NaN` is produced if:
+
+- Any input value is `NaN`
+- Any input value is positive infinity or negative infinity.
+
+To learn more about the `OVER` clause and how to use it, see
+[Window function calls][window-function-calls].
+
+[window-function-calls]: window_function_calls.md
+
+`VAR_POP` can be used with differential privacy. To learn more, see
+[Differentially private aggregate functions][dp-functions].
+
+**Return Data Type**
+
+`DOUBLE`
+
+**Examples**
+
+```sql
+SELECT VAR_POP(x) AS results FROM UNNEST([10, 14, 18]) AS x
+
+/*--------------------+
+ | results            |
+ +--------------------+
+ | 10.666666666666666 |
+ +--------------------*/
+```
+
+```sql
+SELECT VAR_POP(x) AS results FROM UNNEST([10, 14, NULL]) AS x
+
+/*----------+
+ | results |
+ +---------+
+ | 4       |
+ +---------*/
+```
+
+```sql
+SELECT VAR_POP(x) AS results FROM UNNEST([10, NULL]) AS x
+
+/*----------+
+ | results |
+ +---------+
+ | 0       |
+ +---------*/
+```
+
+```sql
+SELECT VAR_POP(x) AS results FROM UNNEST([NULL]) AS x
+
+/*---------+
+ | results |
+ +---------+
+ | NULL    |
+ +---------*/
+```
+
+```sql
+SELECT VAR_POP(x) AS results FROM UNNEST([10, 14, CAST('Infinity' as DOUBLE)]) AS x
+
+/*---------+
+ | results |
+ +---------+
+ | NaN     |
+ +---------*/
+```
+
+[dp-functions]: #aggregate-dp-functions
+
+### `VAR_SAMP`
+
+```sql
+VAR_SAMP(
+  [ DISTINCT ]
+  expression
+  [ WHERE where_expression ]
+  [ HAVING { MAX | MIN } having_expression ]
+)
+[ OVER over_clause ]
+
+over_clause:
+  { named_window | ( [ window_specification ] ) }
+
+window_specification:
+  [ named_window ]
+  [ PARTITION BY partition_expression [, ...] ]
+  [ ORDER BY expression [ { ASC | DESC }  ] [, ...] ]
+  [ window_frame_clause ]
+
+```
+
+**Description**
+
+Returns the sample (unbiased) variance of the values. The return result is
+between `0` and `+Inf`.
+
+All numeric types are supported. If the
+input is `NUMERIC` or `NUMERIC` then the internal aggregation is
+stable with the final output converted to a `DOUBLE`.
+Otherwise the input is converted to a `DOUBLE`
+before aggregation, resulting in a potentially unstable result.
+
+This function ignores any `NULL` inputs. If there are fewer than two non-`NULL`
+inputs, this function returns `NULL`.
+
+`NaN` is produced if:
+
+- Any input value is `NaN`
+- Any input value is positive infinity or negative infinity.
+
+To learn more about the optional aggregate clauses that you can pass
+into this function, see
+[Aggregate function calls][aggregate-function-calls].
+
+This function can be used with the
+[`AGGREGATION_THRESHOLD` clause][agg-threshold-clause].
+
+[aggregate-function-calls]: aggregate_function_calls.md
+[agg-threshold-clause]: ../syntax/query_syntax.md#agg-threshold_clause
+
+To learn more about the `OVER` clause and how to use it, see
+[Window function calls][window-function-calls].
+
+[window-function-calls]: window_function_calls.md
+
+**Return Data Type**
+
+`DOUBLE`
+
+**Examples**
+
+```sql
+SELECT VAR_SAMP(x) AS results FROM UNNEST([10, 14, 18]) AS x
+
+/*---------+
+ | results |
+ +---------+
+ | 16      |
+ +---------*/
+```
+
+```sql
+SELECT VAR_SAMP(x) AS results FROM UNNEST([10, 14, NULL]) AS x
+
+/*---------+
+ | results |
+ +---------+
+ | 8       |
+ +---------*/
+```
+
+```sql
+SELECT VAR_SAMP(x) AS results FROM UNNEST([10, NULL]) AS x
+
+/*---------+
+ | results |
+ +---------+
+ | NULL    |
+ +---------*/
+```
+
+```sql
+SELECT VAR_SAMP(x) AS results FROM UNNEST([NULL]) AS x
+
+/*---------+
+ | results |
+ +---------+
+ | NULL    |
+ +---------*/
+```
+
+```sql
+SELECT VAR_SAMP(x) AS results FROM UNNEST([10, 14, CAST('Infinity' as DOUBLE)]) AS x
+
+/*---------+
+ | results |
+ +---------+
+ | NaN     |
+ +---------*/
+```
+
+### `VARIANCE`
+
+```sql
+VARIANCE(
+  [ DISTINCT ]
+  expression
+  [ WHERE where_expression ]
+  [ HAVING { MAX | MIN } having_expression ]
+)
+[ OVER over_clause ]
+
+over_clause:
+  { named_window | ( [ window_specification ] ) }
+
+window_specification:
+  [ named_window ]
+  [ PARTITION BY partition_expression [, ...] ]
+  [ ORDER BY expression [ { ASC | DESC }  ] [, ...] ]
+  [ window_frame_clause ]
+
+```
+
+**Description**
+
+An alias of [VAR_SAMP][stat-agg-link-to-var-samp].
+
+[stat-agg-link-to-var-samp]: #var-samp
+[agg-function-calls]: aggregate_function_calls.md

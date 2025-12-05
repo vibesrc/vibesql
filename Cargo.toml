@@ -1,0 +1,34 @@
+[package]
+name = "vibesql"
+version = "0.1.0"
+edition = "2021"
+description = "A SQL parser and semantic analyzer conforming to modern ISO SQL standards"
+license = "MIT"
+repository = "https://github.com/bherbruck/vibesql"
+homepage = "https://github.com/bherbruck/vibesql"
+documentation = "https://docs.rs/vibesql"
+readme = "README.md"
+keywords = ["sql", "parser", "database", "query", "analyzer"]
+categories = ["database", "parser-implementations"]
+authors = ["Brennan Herbruck"]
+
+[lib]
+name = "vibesql"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vibesql"
+path = "src/main.rs"
+
+[dependencies]
+# Minimal dependencies - only using standard library features
+
+[dev-dependencies]
+# Test framework uses built-in #[test]
+
+[features]
+default = []
+
+[profile.release]
+opt-level = 3
+lto = true
